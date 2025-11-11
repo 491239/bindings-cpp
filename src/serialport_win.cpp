@@ -347,27 +347,34 @@ DWORD __stdcall WriteThread(LPVOID param) {
 
   OVERLAPPED* ov = new OVERLAPPED;
   memset(ov, 0, sizeof(OVERLAPPED));
-  ov->hEvent = CreateEvent(NULL, 0, 0, NULL);
+  ov->hEvent = CreateEvent(NULL, 1, 0, NULL);
 
-  char* offsetPtr = baton->bufferData + baton->offset;
-  // WriteFileEx requires calling GetLastError even upon success. Clear the error beforehand.
-  SetLastError(0);
   DWORD writtenLen = 0;
-  WriteFile(int2handle(baton->fd), offsetPtr,
-            static_cast<DWORD>(baton->bufferLength - baton->offset), &writtenLen, ov);
-  // Error codes when call is successful, such as ERROR_MORE_DATA.
-  DWORD lastError = GetLastError();
-  if (lastError != ERROR_SUCCESS && lastError != ERROR_IO_PENDING) {
-      ErrorCodeToString("Writing to COM port (WriteFile)", lastError, baton->errorString);
+  DWORD lastError;
+  HANDLE f = int2handle(baton->fd);
+//  SetLastError(0);
+  while (baton->offset < baton->bufferLength) {
+    ResetEvent(ov->hEvent);
+    char* offsetPtr = baton->bufferData + baton->offset;
+    writtenLen = 0;
+    if (!WriteFile(f, offsetPtr,
+                  static_cast<DWORD>(baton->bufferLength - baton->offset), &writtenLen, ov)) {
+        lastError = GetLastError();
+        if (lastError != ERROR_IO_PENDING) {
+            ErrorCodeToString("Writing to COM port (WriteFile)", lastError, baton->errorString);
+            break;
+        }
+        if (!GetOverlappedResult(int2handle(baton->fd), ov, &writtenLen, true)) {
+            lastError = GetLastError();
+            ErrorCodeToString("Writing to COM port (GetOverlappedResult)", lastError, baton->errorString);
+            break;
+        }
+    }
+    baton->offset += writtenLen;
+    if (writtenLen == 0)
+        break;
   }
-  if(!GetOverlappedResult(int2handle(baton->fd), ov, &writtenLen, true))
-  {
-      lastError = GetLastError();
-      if (lastError != ERROR_SUCCESS) {
-          ErrorCodeToString("Writing to COM port (GetOverlappedResult)", lastError, baton->errorString);
-      }
-  }
-  baton->offset += writtenLen;
+  CloseHandle(ov->hEvent);
   delete ov;
   // Signal the main thread to run the callback.
   uv_async_send(async);
@@ -516,7 +523,7 @@ DWORD __stdcall ReadThread(LPVOID param) {
   memset(ov, 0, sizeof(OVERLAPPED));
   ov->hEvent = CreateEvent(NULL, 1, 0, NULL);
   COMMTIMEOUTS commTimeouts = {};
-  commTimeouts.ReadIntervalTimeout = 0;
+  commTimeouts.ReadIntervalTimeout = 20;
   if (!SetCommTimeouts(int2handle(baton->fd), &commTimeouts)) {
       lastError = GetLastError();
       ErrorCodeToString("Setting COM timeout (SetCommTimeouts)", lastError, baton->errorString);
@@ -527,7 +534,7 @@ DWORD __stdcall ReadThread(LPVOID param) {
   SetLastError(0);
   DWORD readLen;
   // Only read 1 byte, so that the callback will be triggered once any data arrives.
-  ReadFile(int2handle(baton->fd), offsetPtr, 1, &readLen, ov);
+  ReadFile(int2handle(baton->fd), offsetPtr, static_cast<DWORD>(baton->bytesToRead), &readLen, ov);
   // Error codes when call is successful, such as ERROR_MORE_DATA.
   lastError = GetLastError();
   if (lastError != ERROR_SUCCESS && lastError != ERROR_IO_PENDING) {
@@ -538,8 +545,10 @@ DWORD __stdcall ReadThread(LPVOID param) {
           ErrorCodeToString("Reading from COM port (GetOverlappedResult)", lastError, baton->errorString);
       }
   }
-  baton->bytesToRead -= readLen;
-  baton->bytesRead += readLen;
+  if (readLen > 0) {
+      baton->bytesToRead -= readLen;
+      baton->bytesRead += readLen;
+  }
 //  CloseHandle(int2handle(baton->fd));
   delete ov;
   // Signal the main thread to run the callback.
