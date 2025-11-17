@@ -1,7 +1,7 @@
 {
-  "name": "@serialport/bindings-cpp",
+  "name": "bindings-cpp-pwa",
   "description": "SerialPort Hardware bindings for node serialport written in c++",
-  "version": "0.0.0-development",
+  "version": "1.0.0-release",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "keywords": [
@@ -91,7 +91,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/serialport/bindings-cpp.git"
+    "url": "git+https://github.com/491239/bindings-cpp.git"
   },
   "funding": "https://opencollective.com/serialport/donate",
   "changelog": {
@@ -109,5 +109,14 @@
       "esbuild-register"
     ],
     "spec": "lib/**/*.test.*"
-  }
+  },
+  "bugs": {
+    "url": "https://github.com/491239/bindings-cpp/issues"
+  },
+  "homepage": "https://github.com/491239/bindings-cpp#readme",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "author": "lzx491378583@gmail.com"
 }
