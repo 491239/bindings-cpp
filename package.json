@@ -1,7 +1,7 @@
 {
-  "name": "bindings-cpp-pwa",
+  "name": "bindings-cpp-fixpwa",
   "description": "SerialPort Hardware bindings for node serialport written in c++",
-  "version": "1.0.0-release",
+  "version": "1.0.0",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "keywords": [
