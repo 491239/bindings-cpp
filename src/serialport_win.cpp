@@ -523,7 +523,7 @@ DWORD __stdcall ReadThread(LPVOID param) {
   memset(ov, 0, sizeof(OVERLAPPED));
   ov->hEvent = CreateEvent(NULL, 1, 0, NULL);
   COMMTIMEOUTS commTimeouts = {};
-  commTimeouts.ReadIntervalTimeout = 20;
+  commTimeouts.ReadIntervalTimeout = 10;
   if (!SetCommTimeouts(int2handle(baton->fd), &commTimeouts)) {
       lastError = GetLastError();
       ErrorCodeToString("Setting COM timeout (SetCommTimeouts)", lastError, baton->errorString);
@@ -548,6 +548,7 @@ DWORD __stdcall ReadThread(LPVOID param) {
   if (readLen > 0) {
       baton->bytesToRead -= readLen;
       baton->bytesRead += readLen;
+      baton->offset += readLen;
   }
 //  CloseHandle(int2handle(baton->fd));
   delete ov;
