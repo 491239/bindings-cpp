@@ -1,7 +1,7 @@
 {
-  "name": "bindings-cpp-fixpwa",
+  "name": "bindings-cpp-fix-was",
   "description": "SerialPort Hardware bindings for node serialport written in c++",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "keywords": [
@@ -54,6 +54,14 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "files": [
+    "dist",
+    "src",
+    "LICENSE",
+    "README.md",
+    "binding.gyp",
+    "package.json"
+  ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig-build.json",
     "install": "node-gyp-build",
@@ -93,7 +101,6 @@
     "type": "git",
     "url": "git+https://github.com/491239/bindings-cpp.git"
   },
-  "funding": "https://opencollective.com/serialport/donate",
   "changelog": {
     "labels": {
       "breaking": ":boom: BREAKING CHANGES :boom:",
