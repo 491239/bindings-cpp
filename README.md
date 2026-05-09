@@ -1,4 +1,4 @@
-# A fork of @serialport/bindings-cpp, fix Windows PWA read and write.
+# A fork of @serialport/bindings-cpp, fix read and write while publishing to Microsoft store(Windows app store).
 
 [![Backers on Open Collective](https://opencollective.com/serialport/backers/badge.svg)](#backers)
 [![Sponsors on Open Collective](https://opencollective.com/serialport/sponsors/badge.svg)](#sponsors)
