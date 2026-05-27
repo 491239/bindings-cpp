@@ -206,10 +206,10 @@ void OpenBaton::Execute() {
   // Set the timeouts for read and write operations.
   // Read operation will wait for at least 1 byte to be received.
   COMMTIMEOUTS commTimeouts = {};
-  commTimeouts.ReadIntervalTimeout = 0;          // Never timeout, always wait for data.
+  commTimeouts.ReadIntervalTimeout = 10;          // Never timeout, always wait for data.
   commTimeouts.ReadTotalTimeoutMultiplier = 0;   // Do not allow big read timeout when big read buffer used
   commTimeouts.ReadTotalTimeoutConstant = 0;     // Total read timeout (period of read loop)
-  commTimeouts.WriteTotalTimeoutConstant = 0;    // Const part of write timeout
+  commTimeouts.WriteTotalTimeoutConstant = MAXDWORD;    // Const part of write timeout
   commTimeouts.WriteTotalTimeoutMultiplier = 0;  // Variable part of write timeout (per byte)
 
   if (!SetCommTimeouts(file, &commTimeouts)) {
@@ -360,12 +360,15 @@ DWORD __stdcall WriteThread(LPVOID param) {
     if (!WriteFile(f, offsetPtr,
                   static_cast<DWORD>(baton->bufferLength - baton->offset), &writtenLen, ov)) {
         lastError = GetLastError();
-        if (lastError != ERROR_IO_PENDING) {
+        // Write failed.
+        if (lastError != ERROR_IO_PENDING && lastError != ERROR_SUCCESS) {
             ErrorCodeToString("Writing to COM port (WriteFile)", lastError, baton->errorString);
             break;
         }
-        if (!GetOverlappedResult(int2handle(baton->fd), ov, &writtenLen, true)) {
-            lastError = GetLastError();
+    }
+    if (!GetOverlappedResult(int2handle(baton->fd), ov, &writtenLen, true)) {
+        lastError = GetLastError();
+        if (lastError != ERROR_OPERATION_ABORTED) {
             ErrorCodeToString("Writing to COM port (GetOverlappedResult)", lastError, baton->errorString);
             break;
         }
@@ -518,31 +521,43 @@ DWORD __stdcall ReadThread(LPVOID param) {
   uv_async_t* async = static_cast<uv_async_t*>(param);
   ReadBaton* baton = static_cast<ReadBaton*>(async->data);
   DWORD lastError;
-
+  BOOL readOk;
   OVERLAPPED* ov = new OVERLAPPED;
   memset(ov, 0, sizeof(OVERLAPPED));
   ov->hEvent = CreateEvent(NULL, 1, 0, NULL);
-  COMMTIMEOUTS commTimeouts = {};
-  commTimeouts.ReadIntervalTimeout = 10;
-  if (!SetCommTimeouts(int2handle(baton->fd), &commTimeouts)) {
-      lastError = GetLastError();
-      ErrorCodeToString("Setting COM timeout (SetCommTimeouts)", lastError, baton->errorString);
-  }
-  // ReadFileEx doesn't use overlapped's hEvent, so it is reserved for user data.
+//  COMMTIMEOUTS commTimeouts = {0};
+//  commTimeouts.ReadIntervalTimeout = MAXDWORD;
+//  if (!SetCommTimeouts(int2handle(baton->fd), &commTimeouts)) {
+//      lastError = GetLastError();
+//      ErrorCodeToString("Setting COM timeout (SetCommTimeouts)", lastError, baton->errorString);
+//      delete ov;
+//      // Signal the main thread to run the callback.
+//      uv_async_send(async);
+//      ExitThread(0);
+//  }
   char* offsetPtr = baton->bufferData + baton->offset;
-  // ReadFileEx requires calling GetLastError even upon success. Clear the error beforehand.
   SetLastError(0);
   DWORD readLen;
-  // Only read 1 byte, so that the callback will be triggered once any data arrives.
-  ReadFile(int2handle(baton->fd), offsetPtr, static_cast<DWORD>(baton->bytesToRead), &readLen, ov);
+  // Read all bytes arrived
+  readOk = ReadFile(int2handle(baton->fd), offsetPtr, static_cast<DWORD>(baton->bytesToRead), &readLen, ov);
   // Error codes when call is successful, such as ERROR_MORE_DATA.
-  lastError = GetLastError();
-  if (lastError != ERROR_SUCCESS && lastError != ERROR_IO_PENDING) {
-      ErrorCodeToString("Reading from COM port (ReadFile)", lastError, baton->errorString);
+  if (!readOk) {
+      lastError = GetLastError();
+      if (lastError != ERROR_SUCCESS && lastError != ERROR_IO_PENDING) {
+          ErrorCodeToString("Reading from COM port (ReadFile)", lastError, baton->errorString);
+          delete ov;
+          uv_async_send(async);
+          ExitThread(0);
+      }
   }
   if (!GetOverlappedResult(int2handle(baton->fd), ov, &readLen, true)) {
-      if (GetLastError() != ERROR_SUCCESS) {
+      lastError = GetLastError();
+      // Aborted is not error.
+      if (lastError != ERROR_OPERATION_ABORTED) {
           ErrorCodeToString("Reading from COM port (GetOverlappedResult)", lastError, baton->errorString);
+          delete ov;
+          uv_async_send(async);
+          ExitThread(0);
       }
   }
   if (readLen > 0) {
