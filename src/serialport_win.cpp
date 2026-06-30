@@ -206,10 +206,10 @@ void OpenBaton::Execute() {
   // Set the timeouts for read and write operations.
   // Read operation will wait for at least 1 byte to be received.
   COMMTIMEOUTS commTimeouts = {};
-  commTimeouts.ReadIntervalTimeout = 10;          // Never timeout, always wait for data.
+  commTimeouts.ReadIntervalTimeout = 10;          // Wait for data in 10ms.
   commTimeouts.ReadTotalTimeoutMultiplier = 0;   // Do not allow big read timeout when big read buffer used
   commTimeouts.ReadTotalTimeoutConstant = 0;     // Total read timeout (period of read loop)
-  commTimeouts.WriteTotalTimeoutConstant = MAXDWORD;    // Const part of write timeout
+  commTimeouts.WriteTotalTimeoutConstant = MAXDWORD;    // Disable write timeout.
   commTimeouts.WriteTotalTimeoutMultiplier = 0;  // Variable part of write timeout (per byte)
 
   if (!SetCommTimeouts(file, &commTimeouts)) {
